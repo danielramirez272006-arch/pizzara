@@ -5,6 +5,7 @@ export const InteractiveBoard = () => {
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
+  const textInputRef = useRef(null);
 
   const [isDrawing, setIsDrawing] = useState(false);
   const [boardType, setBoardType] = useState('acrylic'); // 'acrylic' | 'chalk' | 'blueprint'
@@ -14,9 +15,19 @@ export const InteractiveBoard = () => {
   const [tool, setTool] = useState('pen'); // 'pen' | 'line' | 'arrow' | 'rect' | 'circle' | 'text' | 'stamp' | 'eraser'
   const [isFilled, setIsFilled] = useState(false);
   const [selectedStamp, setSelectedStamp] = useState('⭐ Excelente');
-  const [textInput, setTextInput] = useState('Nota de clase');
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  // Opciones Avanzadas de Texto en Lienzo (WYSIWYG)
+  const [fontSize, setFontSize] = useState(24);
+  const [fontFamily, setFontFamily] = useState('sans-serif');
+  const [isBold, setIsBold] = useState(true);
+  const [activeTextEditor, setActiveTextEditor] = useState({
+    isOpen: false,
+    x: 0,
+    y: 0,
+    text: '',
+  });
 
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [history, setHistory] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
@@ -37,6 +48,13 @@ export const InteractiveBoard = () => {
     { label: '❓ Pregunta', icon: '❓' },
     { label: '✅ Correcto', icon: '✅' },
     { label: '🎯 Objetivo', icon: '🎯' },
+  ];
+
+  const fontsList = [
+    { name: 'Moderna (Sans-serif)', value: 'sans-serif' },
+    { name: 'Caligrafía Docente (Cursiva)', value: '"Caveat", cursive, sans-serif' },
+    { name: 'Clásica Elegante (Serif)', value: '"Playfair Display", serif' },
+    { name: 'Código / Fórmulas (Mono)', value: '"Courier New", monospace' },
   ];
 
   const getCanvasBackground = () => {
@@ -129,13 +147,20 @@ export const InteractiveBoard = () => {
     initCanvas();
   }, [boardType, guidePattern, isFullscreen]);
 
+  // Enfocar input de texto flotante cuando se abre
+  useEffect(() => {
+    if (activeTextEditor.isOpen && textInputRef.current) {
+      textInputRef.current.focus();
+    }
+  }, [activeTextEditor.isOpen]);
+
   const saveState = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     setHistory((prev) => [...prev.slice(-20), imageData]);
-    setRedoStack([]); // reset redo on new action
+    setRedoStack([]);
   };
 
   const undo = () => {
@@ -180,14 +205,48 @@ export const InteractiveBoard = () => {
     };
   };
 
+  // Confirmar y plasmar el texto flotante en el canvas
+  const commitFloatingText = () => {
+    if (!activeTextEditor.isOpen) return;
+
+    const trimmed = activeTextEditor.text.trim();
+    if (trimmed) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+
+      ctx.save();
+      ctx.font = `${isBold ? 'bold' : 'normal'} ${fontSize}px ${fontFamily}`;
+      ctx.fillStyle = color;
+      ctx.textBaseline = 'top';
+
+      // Soporte multilínea al estampar
+      const lines = activeTextEditor.text.split('\n');
+      const lineHeight = fontSize * 1.25;
+
+      lines.forEach((line, index) => {
+        ctx.fillText(line, activeTextEditor.x, activeTextEditor.y + index * lineHeight);
+      });
+
+      ctx.restore();
+      saveState();
+      addToast('Texto plasmado en la pizarra ✍️', 'success');
+    }
+
+    setActiveTextEditor({ isOpen: false, x: 0, y: 0, text: '' });
+  };
+
+  const cancelFloatingText = () => {
+    setActiveTextEditor({ isOpen: false, x: 0, y: 0, text: '' });
+  };
+
   const handleCanvasClick = (e) => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
     const pos = getPos(e);
 
     if (tool === 'stamp') {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
       ctx.save();
-      ctx.font = 'bold 22px sans-serif';
+      ctx.font = 'bold 24px sans-serif';
       ctx.fillStyle = color;
       ctx.shadowColor = 'rgba(0,0,0,0.3)';
       ctx.shadowBlur = 4;
@@ -196,17 +255,16 @@ export const InteractiveBoard = () => {
       saveState();
       addToast(`Sello "${selectedStamp}" estampado`, 'success');
     } else if (tool === 'text') {
-      const text = prompt('Escribe el texto para la pizarra:', textInput);
-      if (text) {
-        setTextInput(text);
-        ctx.save();
-        ctx.font = `bold ${Math.max(16, lineWidth * 3)}px var(--font-family, sans-serif)`;
-        ctx.fillStyle = color;
-        ctx.fillText(text, pos.x, pos.y);
-        ctx.restore();
-        saveState();
-        addToast('Texto añadido a la pizarra', 'success');
+      if (activeTextEditor.isOpen) {
+        commitFloatingText();
       }
+      // Abrir editor flotante en la posición exacta del clic
+      setActiveTextEditor({
+        isOpen: true,
+        x: pos.x,
+        y: pos.y,
+        text: '',
+      });
     }
   };
 
@@ -214,6 +272,11 @@ export const InteractiveBoard = () => {
     if (tool === 'text' || tool === 'stamp') {
       handleCanvasClick(e);
       return;
+    }
+
+    // Si había un texto abierto, confirmarlo antes de dibujar
+    if (activeTextEditor.isOpen) {
+      commitFloatingText();
     }
 
     const canvas = canvasRef.current;
@@ -298,6 +361,7 @@ export const InteractiveBoard = () => {
   };
 
   const clearCanvas = () => {
+    cancelFloatingText();
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = getCanvasBackground();
@@ -318,7 +382,6 @@ export const InteractiveBoard = () => {
       img.onload = () => {
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
-        // Escalar imagen proporcionalmente
         const hRatio = canvas.width / img.width;
         const vRatio = canvas.height / img.height;
         const ratio = Math.min(hRatio, vRatio, 1);
@@ -327,7 +390,7 @@ export const InteractiveBoard = () => {
 
         ctx.drawImage(img, 0, 0, img.width, img.height, centerShiftX, centerShiftY, img.width * ratio, img.height * ratio);
         saveState();
-        addToast('Imagen cargada en la pizarra para anotaciones 🖼️', 'success');
+        addToast('Imagen cargada en la pizarra 🖼️', 'success');
       };
       img.src = event.target.result;
     };
@@ -336,6 +399,7 @@ export const InteractiveBoard = () => {
 
   // Plantillas Didácticas
   const loadTemplate = (type) => {
+    cancelFloatingText();
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     clearCanvas();
@@ -416,6 +480,7 @@ export const InteractiveBoard = () => {
   };
 
   const downloadCanvas = () => {
+    commitFloatingText();
     const canvas = canvasRef.current;
     const image = canvas.toDataURL('image/png');
     const link = document.createElement('a');
@@ -487,7 +552,7 @@ export const InteractiveBoard = () => {
           <button className={`tool-btn ${tool === 'circle' ? 'active' : ''}`} onClick={() => setTool('circle')} title="Círculo">
             ⭕ Círculo
           </button>
-          <button className={`tool-btn ${tool === 'text' ? 'active' : ''}`} onClick={() => setTool('text')} title="Escribir Texto">
+          <button className={`tool-btn ${tool === 'text' ? 'active' : ''}`} onClick={() => setTool('text')} title="Escribir Texto en Vivo (Haz clic donde quieras escribir)">
             🔤 Texto
           </button>
           <button className={`tool-btn ${tool === 'stamp' ? 'active' : ''}`} onClick={() => setTool('stamp')} title="Sellos Docentes">
@@ -513,30 +578,74 @@ export const InteractiveBoard = () => {
           ))}
         </div>
 
-        {/* Opciones de Relleno & Grosor */}
-        <div className="toolbar-group options-group">
-          <label className="checkbox-tool-label">
-            <input
-              type="checkbox"
-              checked={isFilled}
-              onChange={(e) => setIsFilled(e.target.checked)}
-            />
-            <span>Relleno</span>
-          </label>
+        {/* Barra de opciones específicas para TEXTO */}
+        {tool === 'text' && (
+          <div className="toolbar-group text-options-toolbar">
+            <select
+              value={fontFamily}
+              onChange={(e) => setFontFamily(e.target.value)}
+              className="font-family-select"
+              title="Tipografía de Texto"
+            >
+              {fontsList.map((f) => (
+                <option key={f.name} value={f.value}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
 
-          <div className="stroke-group">
-            <label htmlFor="stroke-slider">Grosor:</label>
-            <input
-              id="stroke-slider"
-              type="range"
-              min="2"
-              max="28"
-              value={lineWidth}
-              onChange={(e) => setLineWidth(Number(e.target.value))}
-            />
-            <span>{lineWidth}px</span>
+            <select
+              value={fontSize}
+              onChange={(e) => setFontSize(Number(e.target.value))}
+              className="font-size-select"
+              title="Tamaño de Fuente"
+            >
+              <option value={16}>16px Pequeño</option>
+              <option value={20}>20px Normal</option>
+              <option value={24}>24px Mediano</option>
+              <option value={32}>32px Grande</option>
+              <option value={44}>44px Título</option>
+            </select>
+
+            <button
+              type="button"
+              className={`tool-btn ${isBold ? 'active' : ''}`}
+              onClick={() => setIsBold(!isBold)}
+              title="Negrita"
+            >
+              <strong>B</strong>
+            </button>
+
+            <span className="text-instruction-hint">💡 Haz clic en el lienzo para escribir</span>
           </div>
-        </div>
+        )}
+
+        {/* Opciones de Relleno & Grosor para figuras */}
+        {tool !== 'text' && (
+          <div className="toolbar-group options-group">
+            <label className="checkbox-tool-label">
+              <input
+                type="checkbox"
+                checked={isFilled}
+                onChange={(e) => setIsFilled(e.target.checked)}
+              />
+              <span>Relleno</span>
+            </label>
+
+            <div className="stroke-group">
+              <label htmlFor="stroke-slider">Grosor:</label>
+              <input
+                id="stroke-slider"
+                type="range"
+                min="2"
+                max="28"
+                value={lineWidth}
+                onChange={(e) => setLineWidth(Number(e.target.value))}
+              />
+              <span>{lineWidth}px</span>
+            </div>
+          </div>
+        )}
 
         {/* Patrón Guía de Fondo */}
         <div className="toolbar-group guide-group">
@@ -632,7 +741,7 @@ export const InteractiveBoard = () => {
         </div>
       </div>
 
-      {/* Lienzo Canvas */}
+      {/* Lienzo Canvas con Editor de Texto Flotante En Vivo */}
       <div className="canvas-wrapper">
         <canvas
           ref={canvasRef}
@@ -645,6 +754,51 @@ export const InteractiveBoard = () => {
           onTouchEnd={stopDrawing}
           className="practice-canvas"
         />
+
+        {/* Editor de Texto Flotante Interactivo */}
+        {activeTextEditor.isOpen && (
+          <div
+            className="floating-text-box"
+            style={{
+              top: `${activeTextEditor.y}px`,
+              left: `${activeTextEditor.x}px`,
+            }}
+          >
+            <textarea
+              ref={textInputRef}
+              rows={2}
+              value={activeTextEditor.text}
+              placeholder="Escribe tu texto docente aquí..."
+              style={{
+                color: color,
+                fontSize: `${fontSize}px`,
+                fontFamily: fontFamily,
+                fontWeight: isBold ? 'bold' : 'normal',
+                caretColor: color,
+              }}
+              className="floating-textarea"
+              onChange={(e) =>
+                setActiveTextEditor((prev) => ({ ...prev, text: e.target.value }))
+              }
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  commitFloatingText();
+                } else if (e.key === 'Escape') {
+                  cancelFloatingText();
+                }
+              }}
+            />
+            <div className="floating-text-actions">
+              <button onClick={commitFloatingText} className="btn-text-confirm" title="Presiona Enter para estampar">
+                ✓ Listo (Enter)
+              </button>
+              <button onClick={cancelFloatingText} className="btn-text-cancel" title="Cancelar texto">
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
