@@ -11,7 +11,9 @@ export const AuthProvider = ({ children }) => {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        return parsed?.user || null;
+        if (parsed && typeof parsed === 'object') {
+          return parsed.user || (parsed.email ? parsed : null);
+        }
       }
     } catch (error) {
       console.error('Error al recuperar la sesión local:', error);
