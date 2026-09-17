@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../shared/context/auth-context';
 import { useToast } from '../../shared/context/toast-context';
 import { Button } from '../../shared/components/ui/button';
@@ -116,6 +116,14 @@ export const LoginForm = () => {
       <Button type="submit" className="w-full">
         Entrar a la plataforma
       </Button>
+
+      <p className="form-footer">
+        ¿No tienes cuenta?{' '}
+        <Link to="/registro" state={location.state}>
+          Crea una cuenta aquí
+        </Link>
+      </p>
     </form>
   );
 };
+

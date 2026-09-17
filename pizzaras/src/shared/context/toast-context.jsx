@@ -1,25 +1,32 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 
 const ToastContext = createContext();
 
 export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
+  const timersRef = useRef(new Map());
+
+  const removeToast = useCallback((id) => {
+    if (timersRef.current.has(id)) {
+      clearTimeout(timersRef.current.get(id));
+      timersRef.current.delete(id);
+    }
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
   const addToast = useCallback((message, type = 'info', duration = 3500) => {
     const id = Date.now() + Math.random();
     setToasts((prev) => [...prev, { id, message, type }]);
 
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
+    const timer = setTimeout(() => {
+      removeToast(id);
     }, duration);
-  }, []);
 
-  const removeToast = useCallback((id) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
+    timersRef.current.set(id, timer);
+  }, [removeToast]);
 
   return (
-    <ToastContext.Provider value={{ addToast }}>
+    <ToastContext.Provider value={{ addToast, removeToast }}>
       {children}
       <div className="toast-container">
         {toasts.map((toast) => (
@@ -28,7 +35,7 @@ export const ToastProvider = ({ children }) => {
               {toast.type === 'success' ? '✅' : toast.type === 'error' ? '⚠️' : 'ℹ️'}
             </span>
             <span className="toast-message">{toast.message}</span>
-            <button onClick={() => removeToast(toast.id)} className="toast-close">×</button>
+            <button onClick={() => removeToast(toast.id)} className="toast-close" aria-label="Cerrar notificación">×</button>
           </div>
         ))}
       </div>
@@ -43,3 +50,4 @@ export const useToast = () => {
   }
   return context;
 };
+

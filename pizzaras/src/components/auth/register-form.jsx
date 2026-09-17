@@ -1,16 +1,26 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../shared/context/auth-context';
 import { useToast } from '../../shared/context/toast-context';
 import { Button } from '../../shared/components/ui/button';
 import { Input } from '../../shared/components/ui/input';
 
 export const RegisterForm = () => {
-  const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    role: 'usuario',
+  });
   const [errors, setErrors] = useState({});
   const { login } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Lee ruta solicitada previamente (o /dashboard por defecto)
+  const from = location.state?.from?.pathname || '/dashboard';
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -47,15 +57,26 @@ export const RegisterForm = () => {
       return;
     }
 
-    login({ email: formData.email, name: formData.name });
+    login({
+      email: formData.email,
+      name: formData.name,
+      role: formData.role,
+    });
+    
     addToast(`¡Cuenta creada con éxito! Bienvenido, ${formData.name}`, 'success');
-    navigate('/dashboard');
+    navigate(from, { replace: true });
   };
 
   return (
     <form onSubmit={handleSubmit} className="auth-form" noValidate>
       <h2>Crear Cuenta</h2>
       <p className="form-subtitle">Comienza a dominar las pizarras modernas hoy</p>
+
+      {location.state?.from && (
+        <div className="alert-notice">
+          ℹ️ Regístrate para acceder directamente a: <strong>{location.state.from.pathname}</strong>
+        </div>
+      )}
 
       <Input
         label="Nombre Completo"
@@ -101,12 +122,16 @@ export const RegisterForm = () => {
       />
 
       <Button type="submit" className="w-full">
-        Registrarse
+        Registrarse y Entrar
       </Button>
 
       <p className="form-footer">
-        ¿Ya tienes cuenta? <Link to="/login">Inicia sesión aquí</Link>
+        ¿Ya tienes cuenta?{' '}
+        <Link to="/login" state={location.state}>
+          Inicia sesión aquí
+        </Link>
       </p>
     </form>
   );
 };
+
