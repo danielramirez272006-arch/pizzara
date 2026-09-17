@@ -5,38 +5,45 @@ export const AuthContext = createContext();
 const STORAGE_KEY = 'pizarra_auth_session';
 
 export const AuthProvider = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // 1. PERSISTENCIA SIN PARPADEO (Flicker-Free): Lee de localStorage en el montaje inicial
+  useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved).isAuthenticated : false;
-    } catch {
-      return false;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.user) {
+          setUser(parsed.user);
+        }
+      }
+    } catch (error) {
+      console.error('Error al recuperar la sesión local:', error);
+    } finally {
+      setIsLoading(false);
     }
-  });
+  }, []);
 
-  const [user, setUser] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved).user : null;
-    } catch {
-      return null;
-    }
-  });
-
-  const login = (userData = { email: 'docente@pizarras.com', name: 'Profesor Maestro' }) => {
-    setIsAuthenticated(true);
-    setUser(userData);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ isAuthenticated: true, user: userData }));
+  const login = (userData = { email: 'docente@pizarras.com', name: 'Profesor Maestro', role: 'usuario' }) => {
+    const userWithRole = {
+      email: userData.email,
+      name: userData.name || userData.email.split('@')[0],
+      role: userData.role || 'usuario', // 'usuario' | 'admin'
+    };
+    setUser(userWithRole);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ isAuthenticated: true, user: userWithRole }));
   };
 
   const logout = () => {
-    setIsAuthenticated(false);
     setUser(null);
     localStorage.removeItem(STORAGE_KEY);
   };
 
+  const isAuthenticated = Boolean(user);
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, isLoading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

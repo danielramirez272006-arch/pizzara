@@ -4,7 +4,7 @@ import { useAuth } from '../../context/auth-context';
 import { useToast } from '../../context/toast-context';
 
 export const Navbar = () => {
-  const { isAuthenticated, logout, user } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
 
@@ -65,15 +65,40 @@ export const Navbar = () => {
               <NavLink
                 to="/dashboard"
                 className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+                end
               >
                 Panel
               </NavLink>
+
+              {/* Enlace visible para administradores */}
+              {user?.role === 'admin' && (
+                <NavLink
+                  to="/dashboard/usuarios"
+                  className={({ isActive }) => (isActive ? 'nav-item nav-admin active' : 'nav-item nav-admin')}
+                >
+                  👑 Admin Usuarios
+                </NavLink>
+              )}
+
               <NavLink
                 to="/perfil"
                 className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+                end
               >
-                Perfil ({user?.name || 'Docente'})
+                Perfil
               </NavLink>
+
+              <NavLink
+                to="/perfil/configuracion"
+                className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+              >
+                ⚙️ Configuración
+              </NavLink>
+
+              <span className={`user-role-badge ${user?.role === 'admin' ? 'badge-admin-role' : 'badge-user-role'}`}>
+                {user?.role?.toUpperCase()}
+              </span>
+
               <button onClick={handleLogout} className="btn-logout">
                 Cerrar Sesión
               </button>

@@ -6,14 +6,18 @@ import { Button } from '../../shared/components/ui/button';
 import { Input } from '../../shared/components/ui/input';
 
 export const LoginForm = () => {
-  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [formData, setFormData] = useState({
+    email: 'docente@pizarras.com',
+    password: '••••••••',
+    role: 'usuario', // 'usuario' | 'admin'
+  });
   const [errors, setErrors] = useState({});
   const { login } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Ruta previa a la que intentaba acceder el usuario (o /dashboard por defecto)
+  // 4. Leer ruta previa solicitada (o /dashboard por defecto)
   const from = location.state?.from?.pathname || '/dashboard';
 
   const handleChange = (e) => {
@@ -30,32 +34,36 @@ export const LoginForm = () => {
 
     if (!formData.email.trim()) {
       newErrors.email = 'El correo electrónico es obligatorio';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Ingresa un formato de correo válido';
     }
-
     if (!formData.password.trim()) {
       newErrors.password = 'La contraseña es obligatoria';
-    } else if (formData.password.length < 4) {
-      newErrors.password = 'La contraseña debe tener al menos 4 caracteres';
     }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      addToast('Por favor, corrige los campos del formulario', 'error');
+      addToast('Por favor completa los campos requeridos', 'error');
       return;
     }
 
     const userName = formData.email.split('@')[0];
-    login({ email: formData.email, name: userName });
-    addToast(`¡Bienvenido de nuevo, ${userName}!`, 'success');
+    
+    // Login guardando rol
+    login({
+      email: formData.email,
+      name: userName,
+      role: formData.role,
+    });
+
+    addToast(`¡Bienvenido! Sesión iniciada como "${formData.role.toUpperCase()}"`, 'success');
+    
+    // Redirección inteligente al origen exacto
     navigate(from, { replace: true });
   };
 
   return (
     <form onSubmit={handleSubmit} className="auth-form" noValidate>
       <h2>Iniciar Sesión</h2>
-      <p className="form-subtitle">Ingresa para acceder a tus cursos de pizarras</p>
+      <p className="form-subtitle">Ingresa para acceder a la plataforma de pizarras</p>
 
       {location.state?.from && (
         <div className="alert-notice">
@@ -84,6 +92,26 @@ export const LoginForm = () => {
         error={errors.password}
         required
       />
+
+      {/* 4. Selector de Simulación de Rol */}
+      <div className="input-group">
+        <label htmlFor="role" className="input-label">
+          Simular Rol de Usuario *
+        </label>
+        <select
+          id="role"
+          name="role"
+          value={formData.role}
+          onChange={handleChange}
+          className="input-field role-select"
+        >
+          <option value="usuario">👤 Docente / Estudiante (Rol: usuario)</option>
+          <option value="admin">👑 Administrador del Sistema (Rol: admin)</option>
+        </select>
+        <small className="field-hint">
+          Selecciona "admin" para tener acceso a la ruta protegida <code>/dashboard/usuarios</code>.
+        </small>
+      </div>
 
       <Button type="submit" className="w-full">
         Entrar a la plataforma
