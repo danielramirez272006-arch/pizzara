@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/auth-context';
 import { useToast } from '../../context/toast-context';
@@ -7,6 +7,21 @@ export const Navbar = () => {
   const { isAuthenticated, logout, user } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
+
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('app_theme') || 'dark';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('app_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    addToast(newTheme === 'light' ? 'Modo Claro activado ☀️' : 'Modo Oscuro activado 🌙', 'info');
+  };
 
   const handleLogout = () => {
     logout();
@@ -64,6 +79,15 @@ export const Navbar = () => {
               </button>
             </>
           )}
+
+          {/* Selector de Modo Oscuro / Claro */}
+          <button
+            onClick={toggleTheme}
+            className="theme-toggle-btn"
+            title={`Cambiar a modo ${theme === 'dark' ? 'claro' : 'oscuro'}`}
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
         </div>
       </div>
     </nav>
